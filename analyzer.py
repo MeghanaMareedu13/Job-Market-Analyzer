@@ -38,9 +38,13 @@ class JobAnalyzer:
 
     def get_summary(self):
         """Returns basic statistics about the scraped jobs."""
+        if self.df.empty:
+            return {"total_jobs": 0, "top_locations": {}, "top_companies": {}}
+            
         summary = {
             "total_jobs": len(self.df),
             "top_locations": self.df['location'].value_counts().head(3).to_dict(),
             "top_companies": self.df['company'].value_counts().head(3).to_dict()
         }
+
         return summary

@@ -36,7 +36,12 @@ class JobScraper:
 
         soup = BeautifulSoup(html_content, "html.parser")
         results = soup.find(id="ResultsContainer")
+        if not results:
+            logger.error("ResultsContainer not found in HTML.")
+            return []
+            
         job_elements = results.find_all("div", class_="card-content")
+
 
         jobs_list = []
         for job_element in job_elements:
