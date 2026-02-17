@@ -49,14 +49,28 @@ class JobScraper:
             company = job_element.find("h3", class_="company").text.strip()
             location = job_element.find("p", class_="location").text.strip()
             
-            # Since this is a static demo site, we'll simulate detailed descriptions 
-            # or extract what's available to identify "skills"
+            # Identify skills based on title keyword simulation
+            detected_skills = []
+            lower_title = title.lower()
+            if 'python' in lower_title or 'data' in lower_title: detected_skills += ['Python', 'Pandas', 'SQL']
+            if 'developer' in lower_title: detected_skills += ['JavaScript', 'React', 'Docker']
+            if 'engineer' in lower_title: detected_skills += ['AWS', 'Java', 'Kubernetes']
+            if 'manager' in lower_title: detected_skills += ['Azure', 'Full Stack']
+            
             jobs_list.append({
                 "title": title,
                 "company": company,
                 "location": location,
-                "description": f"Seeking a {title} proficient in Python, SQL, and Cloud technologies." # Simulated for skill analysis
+                "description": f"Seeking a {title} with skills in: {', '.join(detected_skills) or 'Python, SQL'}"
             })
         
         logger.info(f"Successfully parsed {len(jobs_list)} jobs.")
         return jobs_list
+
+    async def discovery_stream(self, jobs_batch):
+        """Asynchronous generator to simulate real-time discovery of jobs."""
+        for job in jobs_batch:
+            # Simulate network/discovery latency
+            await asyncio.sleep(random.uniform(0.1, 0.4))
+            yield job
+
