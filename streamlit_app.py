@@ -1,25 +1,38 @@
 import streamlit as st
-import pandas as pd
-import plotly.express as px
-from scraper import JobScraper
-from analyzer import JobAnalyzer
-import time
-import asyncio
+import sys
+import traceback
 
-# Page Config
+# 1. CRITICAL BOOT CHECK
+# We wrap everything in a try-except at the top level to catch import/syntax errors
+try:
+    import pandas as pd
+    import plotly.express as px
+    import requests
+    from bs4 import BeautifulSoup
+    import time
+    from scraper import JobScraper
+    from analyzer import JobAnalyzer
+except Exception as e:
+    st.error("🚨 CRITICAL BOOT ERROR: A dependency is missing or failing.")
+    st.code(traceback.format_exc())
+    st.stop()
+
+# 2. Page Config (Must be first Streamlit command)
 st.set_page_config(page_title="Job Market Insights", page_icon="🕷️", layout="wide")
 
-st.title("🕷️ Real-Time Job Market Analyzer")
+st.title("🕷️ Real-Time Job Market Analyzer (v2.1)")
 st.markdown("Extracting and analyzing technical skill trends from live job postings.")
 
 # Sidebar
 with st.sidebar:
     st.header("⚙️ Scraper Settings")
     url_option = st.selectbox("Select Target", ["Fake Jobs Demo (Safe)", "Custom URL (Requires Setup)"])
-    if url_option == "Custom URL (Requires Setup)":
-        st.warning("Note: Scraping real sites may require rotating proxies and headers.")
-    
     scrape_button = st.button("🚀 Start Scraping", type="primary")
+    
+    st.divider()
+    st.info("Debugging Info:")
+    st.write(f"Python Version: {sys.version.split()[0]}")
+    st.write(f"Streamlit Version: {st.__version__}")
 
 # UI Placeholders
 metrics_col1, metrics_col2 = st.columns(2)
@@ -37,33 +50,37 @@ def run_streamlit_flow():
         scraper = JobScraper()
         
         # 1. Fetching
-        with st.spinner("Fetching job listings..."):
+        with st.spinner("Fetching data..."):
             html = scraper.fetch_jobs()
             if not html:
-                st.error("Failed to fetch data from the source.")
+                st.error("Failed to fetch data from the source. Source might be down or blocking the request.")
                 return
 
-        # 2. Parsing (Streaming visualization)
-        status_msg.info("Step 1: Parsing HTML and extracting jobs...")
+        # 2. Parsing
+        status_msg.info("Step 1: Parsing HTML...")
         jobs = scraper.parse_jobs(html)
-        total_count.metric("Jobs Found", len(jobs))
         
         if not jobs:
-            st.warning("No jobs were found to process. Try again later.")
+            total_count.metric("Jobs Found", 0)
+            st.warning("No jobs were found. The website structure might have changed.")
             return
 
-        # Simulate a "streaming" feel for parsing
+        total_count.metric("Jobs Found", len(jobs))
+        
+        # Simulated log "stream"
         log_content = []
-        for i, job in enumerate(jobs[:20]): # Show first 20 in logs
-            log_content.append(f"✅ Extracted: {job['title']} @ {job['company']}")
-            log_area.code("\n".join(log_content[-15:]))
-            # Safe progress bar calculation
-            prog = min(((i + 1) / len(jobs)) * 0.5, 0.5)
+        max_logs = min(len(jobs), 20)
+        for i in range(max_logs):
+            job = jobs[i]
+            log_content.append(f"✅ Found: {job['title']} @ {job['company']}")
+            log_area.code("\n".join(log_content[-10:]))
+            # Safe progress
+            prog = 0.1 + (i / max_logs) * 0.4
             progress_bar.progress(prog)
             time.sleep(0.05)
 
         # 3. Analyzing
-        status_msg.info("Step 2: Running Skill Frequency Analysis...")
+        status_msg.info("Step 2: Analyzing Skills...")
         analyzer = JobAnalyzer(jobs)
         skills = analyzer.extract_skills()
         summary = analyzer.get_summary()
@@ -74,7 +91,7 @@ def run_streamlit_flow():
         # 4. Display Charts
         if any(skills.values()):
             df_skills = pd.DataFrame(list(skills.items()), columns=['Skill', 'Mentions'])
-            df_skills = df_skills[df_skills['Mentions'] > 0].head(12)
+            df_skills = df_skills[df_skills['Mentions'] > 0].sort_values(by='Mentions', ascending=True).tail(10)
             
             if not df_skills.empty:
                 fig = px.bar(
@@ -82,41 +99,43 @@ def run_streamlit_flow():
                     x='Mentions', 
                     y='Skill', 
                     orientation='h',
-                    title='Top Trending Skills',
+                    title='Top 10 Trending Skills',
                     color='Mentions',
-                    color_continuous_scale='Viridis',
+                    color_continuous_scale='Bluered_r',
                     template='plotly_dark'
                 )
-                fig.update_layout(yaxis={'categoryorder':'total ascending'})
                 chart_area.plotly_chart(fig, use_container_width=True)
         else:
-            chart_area.warning("No matching skills found in the descriptions.")
+            chart_area.warning("No tracked skills found in job descriptions.")
 
-        # Summary Stats
-        st.subheader("📍 Job Distribution")
-        col1, col2 = st.columns(2)
+        # Distribution UI
+        st.subheader("📍 Insights Summary")
+        c1, c2 = st.columns(2)
         
         if summary['top_locations']:
-            df_loc = pd.DataFrame(list(summary['top_locations'].items()), columns=['Location', 'Count'])
-            fig_loc = px.pie(df_loc, values='Count', names='Location', title='Jobs by Location', template='plotly_dark')
-            col1.plotly_chart(fig_loc, use_container_width=True)
-        else:
-            col1.info("No location data available.")
-
+            df_loc = pd.DataFrame(list(summary['top_locations'].items()), columns=['Location', 'Total'])
+            fig_loc = px.pie(df_loc, values='Total', names='Location', title='Opening Distribution', template='plotly_dark')
+            c1.plotly_chart(fig_loc, use_container_width=True)
+        
         if summary['top_companies']:
-            df_comp = pd.DataFrame(list(summary['top_companies'].items()), columns=['Company', 'Count'])
-            fig_comp = px.bar(df_comp, x='Count', y='Company', title='Top Hiring Companies', template='plotly_dark')
-            col2.plotly_chart(fig_comp, use_container_width=True)
-        else:
-            col2.info("No company data available.")
+            df_comp = pd.DataFrame(list(summary['top_companies'].items()), columns=['Company', 'Openings'])
+            fig_comp = px.bar(df_comp, x='Openings', y='Company', title='Active Companies', template='plotly_dark')
+            c2.plotly_chart(fig_comp, use_container_width=True)
             
     except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
-        st.exception(e)
-
+        st.error(f"Execution Error: {str(e)}")
+        st.code(traceback.format_exc())
 
 if scrape_button:
     run_streamlit_flow()
 else:
-    st.info("Click 'Start Scraping' in the sidebar to begin the market analysis.")
-    st.image("https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&q=80&w=1200", caption="Data-Driven Career Strategy")
+    st.info("Ready. Click 'Start Scraping' to analyze the current market trends.")
+    # Fallback visual
+    st.markdown("""
+    ---
+    ### 📊 What this analyzer looks for:
+    - **Cloud**: AWS, Azure, GCP
+    - **Data**: SQL, Pandas, Spark, Tableau
+    - **Dev**: Python, Java, JavaScript, React, Docker
+    - **Emerging**: AI, Machine Learning, FastAPI
+    """)
