@@ -1,5 +1,6 @@
 beautifulsoup4
 requests
-pandas
-streamlit
+pandas>=2.0.0
+streamlit>=1.41.0
 plotly
+altair<5.0.0
