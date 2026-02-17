@@ -15,6 +15,8 @@ A Python-based web scraper and data analyzer that identifies trending technical 
 - **Patterns**: Functional programming for data transformation
 
 ## 🏃 Run the Analyzer
+
+### Option 1: CLI (Command Line)
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -22,6 +24,16 @@ pip install -r requirements.txt
 # Run the scraper and analyzer
 python main.py
 ```
+
+### Option 2: Streamlit Dashboard (Interactive)
+```bash
+streamlit run streamlit_app.py
+```
+
+## 📊 Streamlit Dashboard Features
+- **Live Scraping Progress**: Watch the logs as jobs are extracted in real-time.
+- **Interactive Charts**: Responsive bar and pie charts showing skill trends and locations.
+- **Dark Mode UI**: Premium visualization experience for recruiters.
 
 ## 📊 Sample Output
 ```text
@@ -32,6 +44,7 @@ Top Technical Skills in Demand:
 - AWS: 45 mentions
 ...
 ```
+
 
 ## 🛡️ Responsible Scraping
 This project is for educational purposes. For production use, always:
